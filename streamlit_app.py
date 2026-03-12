@@ -321,9 +321,9 @@ def main():
                     model_name="gemini-2.5-flash",
                     system_instruction="""You are a Dietary Expert.
                     Consider the user's dietary restrictions and preferences.
-                    Suggest a detailed meal plan for the day (breakfast, lunch, dinner, snacks).
-                    Explain why the plan suits the user's goals.
-                    Focus on clarity and practical recommendations."""
+                    Suggest a highly concise, bulleted meal plan for the day (breakfast, lunch, dinner, snacks).
+                    Explain briefly why the plan suits the user's goals.
+                    Keep responses short, precise, and practical to save reading time."""
                 )
                 dietary_response = dietary_model.generate_content(user_profile)
                 st.session_state.dietary_plan = dietary_response.text
@@ -332,10 +332,10 @@ def main():
                 fitness_model = genai.GenerativeModel(
                     model_name="gemini-2.5-flash",
                     system_instruction="""You are a Fitness Expert.
-                    Provide exercises tailored to the user's goals.
-                    Include warm-up, main workout, and cool-down.
-                    Explain the benefits of each exercise.
-                    Make the plan actionable and detailed."""
+                    Provide highly concise, bulleted exercises tailored to the user's goals.
+                    Include a short warm-up, main workout, and cool-down.
+                    Explain briefly the benefits of each exercise.
+                    Make the plan actionable, precise, and short to save reading time."""
                 )
                 fitness_response = fitness_model.generate_content(user_profile)
                 st.session_state.fitness_plan = fitness_response.text
@@ -346,8 +346,8 @@ def main():
                 display_dietary_plan(st.session_state.dietary_plan)
                 display_fitness_plan(st.session_state.fitness_plan)
 
-            except Exception as e:
-                st.error(f"❌ An error occurred: {e}")
+            except Exception:
+                st.error("❌ The app is currently under maintenance. Please try again later.")
 
     # ─── Q&A Section ───
     if st.session_state.plans_generated:
@@ -365,8 +365,8 @@ def main():
                         run_response = qa_model.generate_content(full_prompt)
                         answer = run_response.text
                         st.session_state.qa_pairs.append((question_input, answer))
-                    except Exception as e:
-                        st.error(f"❌ Error: {e}")
+                    except Exception:
+                        st.error("❌ The app is currently under maintenance. Please try again later.")
 
         if st.session_state.qa_pairs:
             st.markdown("---")
