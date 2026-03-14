@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import google.generativeai as genai
+from groq import Groq
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -197,15 +198,52 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURATION ---
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-if not GOOGLE_API_KEY:
-    st.error("⚠️ GOOGLE_API_KEY not found in environment variables!")
+if not GROQ_API_KEY and not GOOGLE_API_KEY:
+    st.error("⚠️ No API keys found! Set GROQ_API_KEY or GOOGLE_API_KEY in environment variables.")
+
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 try:
-    genai.configure(api_key=GOOGLE_API_KEY)
+    if GOOGLE_API_KEY:
+        genai.configure(api_key=GOOGLE_API_KEY)
 except Exception as e:
     st.error(f"Error configuring Google AI: {e}")
+
+
+def call_llm(prompt, system_instruction=None):
+    """Try Groq first, then Gemini as fallback. Returns text or raises."""
+    # 1. Try Groq (primary)
+    if groq_client:
+        try:
+            messages = []
+            if system_instruction:
+                messages.append({"role": "system", "content": system_instruction})
+            messages.append({"role": "user", "content": prompt})
+            response = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            err_str = str(e).lower()
+            if '429' in str(e) or 'rate' in err_str or 'limit' in err_str:
+                pass  # Fall through to Gemini
+            else:
+                pass  # Fall through to Gemini
+
+    # 2. Fallback to Gemini
+    if GOOGLE_API_KEY:
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=system_instruction
+        ) if system_instruction else genai.GenerativeModel(model_name="gemini-2.5-flash")
+        response = model.generate_content(prompt)
+        return response.text
+
+    raise Exception("All AI models unavailable. Please try again later.")
 
 # --- HELPER FUNCTIONS ---
 def display_dietary_plan(plan_content):
@@ -317,37 +355,28 @@ def main():
                 """
 
                 # Dietary Plan
-                dietary_model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction="""You are a Dietary Expert.
+                dietary_system = """You are a Dietary Expert.
                     Consider the user's dietary restrictions and preferences.
                     Suggest a highly concise, bulleted meal plan for the day (breakfast, lunch, dinner, snacks).
                     Explain briefly why the plan suits the user's goals.
                     Keep responses short, precise, and practical to save reading time."""
-                )
-                dietary_response = dietary_model.generate_content(user_profile)
-                st.session_state.dietary_plan = dietary_response.text
+                st.session_state.dietary_plan = call_llm(user_profile, system_instruction=dietary_system)
 
                 # Fitness Plan
-                fitness_model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction="""You are a Fitness Expert.
+                fitness_system = """You are a Fitness Expert.
                     Provide highly concise, bulleted exercises tailored to the user's goals.
                     Include a short warm-up, main workout, and cool-down.
                     Explain briefly the benefits of each exercise.
                     Make the plan actionable, precise, and short to save reading time."""
-                )
-                fitness_response = fitness_model.generate_content(user_profile)
-                st.session_state.fitness_plan = fitness_response.text
+                st.session_state.fitness_plan = call_llm(user_profile, system_instruction=fitness_system)
 
-                st.session_state.plans_generated = True
-                st.session_state.qa_pairs = []
-
-                display_dietary_plan(st.session_state.dietary_plan)
-                display_fitness_plan(st.session_state.fitness_plan)
-
-            except Exception:
+            except Exception as e:
+                st.session_state.plans_generated = False
                 st.error("❌ The app is currently under maintenance. Please try again later.")
+
+        if st.session_state.plans_generated:
+            display_dietary_plan(st.session_state.dietary_plan)
+            display_fitness_plan(st.session_state.fitness_plan)
 
     # ─── Q&A Section ───
     if st.session_state.plans_generated:
@@ -361,11 +390,9 @@ def main():
                     context = f"Dietary Plan: {st.session_state.dietary_plan}\n\nFitness Plan: {st.session_state.fitness_plan}"
                     full_prompt = f"Context:\n{context}\n\nUser Question: {question_input}\nAnswer as a helpful health assistant."
                     try:
-                        qa_model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-                        run_response = qa_model.generate_content(full_prompt)
-                        answer = run_response.text
+                        answer = call_llm(full_prompt)
                         st.session_state.qa_pairs.append((question_input, answer))
-                    except Exception:
+                    except Exception as e:
                         st.error("❌ The app is currently under maintenance. Please try again later.")
 
         if st.session_state.qa_pairs:
