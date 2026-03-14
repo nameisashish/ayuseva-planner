@@ -318,7 +318,7 @@ def main():
 
                 # Dietary Plan
                 dietary_model = genai.GenerativeModel(
-                    model_name="gemini-2.5-flash",
+                    model_name="gemini-1.5-flash",
                     system_instruction="""You are a Dietary Expert.
                     Consider the user's dietary restrictions and preferences.
                     Suggest a highly concise, bulleted meal plan for the day (breakfast, lunch, dinner, snacks).
@@ -330,7 +330,7 @@ def main():
 
                 # Fitness Plan
                 fitness_model = genai.GenerativeModel(
-                    model_name="gemini-2.5-flash",
+                    model_name="gemini-1.5-flash",
                     system_instruction="""You are a Fitness Expert.
                     Provide highly concise, bulleted exercises tailored to the user's goals.
                     Include a short warm-up, main workout, and cool-down.
@@ -361,7 +361,7 @@ def main():
                     context = f"Dietary Plan: {st.session_state.dietary_plan}\n\nFitness Plan: {st.session_state.fitness_plan}"
                     full_prompt = f"Context:\n{context}\n\nUser Question: {question_input}\nAnswer as a helpful health assistant."
                     try:
-                        qa_model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+                        qa_model = genai.GenerativeModel(model_name="gemini-1.5-flash")
                         run_response = qa_model.generate_content(full_prompt)
                         answer = run_response.text
                         st.session_state.qa_pairs.append((question_input, answer))
