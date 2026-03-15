@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-import google.generativeai as genai
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -199,51 +198,27 @@ st.markdown("""
 
 # --- CONFIGURATION ---
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-if not GROQ_API_KEY and not GOOGLE_API_KEY:
-    st.error("⚠️ No API keys found! Set GROQ_API_KEY or GOOGLE_API_KEY in environment variables.")
+if not GROQ_API_KEY:
+    st.error("⚠️ No API key found! Set GROQ_API_KEY in environment variables.")
 
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
-try:
-    if GOOGLE_API_KEY:
-        genai.configure(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    st.error(f"Error configuring Google AI: {e}")
-
 
 def call_llm(prompt, system_instruction=None):
-    """Try Groq first, then Gemini as fallback. Returns text or raises."""
-    # 1. Try Groq (primary)
-    if groq_client:
-        try:
-            messages = []
-            if system_instruction:
-                messages.append({"role": "system", "content": system_instruction})
-            messages.append({"role": "user", "content": prompt})
-            response = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=messages,
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            err_str = str(e).lower()
-            if '429' in str(e) or 'rate' in err_str or 'limit' in err_str:
-                pass  # Fall through to Gemini
-            else:
-                pass  # Fall through to Gemini
+    """Call Groq LLM. Returns text or raises."""
+    if not groq_client:
+        raise Exception("Groq API key not configured. Please set GROQ_API_KEY.")
 
-    # 2. Fallback to Gemini
-    if GOOGLE_API_KEY:
-        model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=system_instruction
-        ) if system_instruction else genai.GenerativeModel(model_name="gemini-2.5-flash")
-        response = model.generate_content(prompt)
-        return response.text
-
-    raise Exception("All AI models unavailable. Please try again later.")
+    messages = []
+    if system_instruction:
+        messages.append({"role": "system", "content": system_instruction})
+    messages.append({"role": "user", "content": prompt})
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=messages,
+    )
+    return response.choices[0].message.content
 
 # --- HELPER FUNCTIONS ---
 def display_dietary_plan(plan_content):
@@ -357,18 +332,29 @@ def main():
                 # Dietary Plan
                 dietary_system = """You are a Dietary Expert.
                     Consider the user's dietary restrictions and preferences.
-                    Suggest a highly concise, bulleted meal plan for the day (breakfast, lunch, dinner, snacks).
-                    Explain briefly why the plan suits the user's goals.
-                    Keep responses short, precise, and practical to save reading time."""
+                    Provide a detailed, well-structured meal plan with the following:
+                    - Breakfast: 3-4 food options with portion sizes and nutritional benefits
+                    - Mid-Morning Snack: 2-3 healthy snack options
+                    - Lunch: 3-4 food options with portion guidance
+                    - Evening Snack: 2-3 light snack options
+                    - Dinner: 3-4 food options that are easy to digest
+                    - Hydration: 2-3 recommended beverages and daily water intake
+                    Also include: Foods to Avoid (4-5 items), Key Nutrients to Focus On (3-4 nutrients with food sources).
+                    Explain briefly why each meal suits the user's goals. Be practical and actionable."""
                 st.session_state.dietary_plan = call_llm(user_profile, system_instruction=dietary_system)
 
                 # Fitness Plan
                 fitness_system = """You are a Fitness Expert.
-                    Provide highly concise, bulleted exercises tailored to the user's goals.
-                    Include a short warm-up, main workout, and cool-down.
-                    Explain briefly the benefits of each exercise.
-                    Make the plan actionable, precise, and short to save reading time."""
+                    Provide a detailed, well-structured exercise plan with the following:
+                    - Warm-Up: 4-5 dynamic stretches/exercises with duration
+                    - Main Workout: 5-6 exercises with sets, reps, and rest periods
+                    - Cool-Down: 3-4 stretches with hold times
+                    - Weekly Schedule: Suggest which days to do what (e.g., Mon: Upper Body, Tue: Cardio)
+                    Also include: Recovery Tips (3-4 points), Progress Milestones (3-4 goals to aim for).
+                    Explain briefly the benefits of each exercise. Be practical and actionable."""
                 st.session_state.fitness_plan = call_llm(user_profile, system_instruction=fitness_system)
+
+                st.session_state.plans_generated = True
 
             except Exception as e:
                 st.session_state.plans_generated = False
