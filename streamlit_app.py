@@ -1,4 +1,5 @@
 import os
+import html
 import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
@@ -197,7 +198,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURATION ---
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+def get_secret(name):
+    value = os.environ.get(name)
+    if value:
+        return value
+    try:
+        return st.secrets.get(name)
+    except Exception:
+        return None
+
+
+GROQ_API_KEY = get_secret("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
     st.error("⚠️ No API key found! Set GROQ_API_KEY in environment variables.")
@@ -385,16 +396,18 @@ def main():
             st.markdown("---")
             st.markdown("## 💬 Q&A History")
             for q, a in st.session_state.qa_pairs:
+                safe_question = html.escape(q)
+                safe_answer = html.escape(a).replace("\n", "<br>")
                 st.markdown(f"""
                     <div style="background:rgba(232,71,126,0.06); border-left:4px solid #E8477E;
                     padding:0.7rem 1rem; border-radius:0 10px 10px 0; margin-bottom:0.4rem;">
-                    <strong style="color:#E8477E !important;">Q:</strong> {q}</div>
+                    <strong style="color:#E8477E !important;">Q:</strong> {safe_question}</div>
                 """, unsafe_allow_html=True)
                 st.markdown(f"""
                     <div style="background:#FFFFFF; border-left:4px solid #F48FB1;
                     padding:0.7rem 1rem; border-radius:0 10px 10px 0; margin-bottom:1rem;
                     box-shadow:0 1px 6px rgba(0,0,0,0.04);">
-                    <strong style="color:#E8477E !important;">A:</strong> {a}</div>
+                    <strong style="color:#E8477E !important;">A:</strong> {safe_answer}</div>
                 """, unsafe_allow_html=True)
 
     # ─── Footer ───
